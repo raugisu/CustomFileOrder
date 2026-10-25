@@ -1,4 +1,6 @@
-# Custom File Order
+# Custom File Order (Fork)
+
+> This is a personal fork of [Ariubilig/custom-file-order](https://github.com/Ariubilig/custom-file-order). Settings and command IDs are unchanged, so it replaces the original: disable or uninstall the original before using it.
 
 Take control of your file explorer! This lightweight VS Code extension allows you to manually reorder files and folders to suit your workflow.
 

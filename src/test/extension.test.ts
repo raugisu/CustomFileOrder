@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 
-const EXTENSION_ID = 'RARI.custom-file-order';
+const EXTENSION_ID = 'RARI.custom-file-order-fork';
 
 suite('Extension Test Suite', () => {
     const extension = vscode.extensions.getExtension(EXTENSION_ID);
