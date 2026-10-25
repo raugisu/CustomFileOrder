@@ -4,6 +4,22 @@ All notable changes to the "custom-file-order" extension will be documented in t
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [1.3.0-fork.1]
+
+Personal fork of the original extension. Settings and command IDs are unchanged.
+
+### Added
+
+- **New File / New Folder from the context menu create the entry right below the clicked item**
+  (as its sibling, never inside a folder) and place it there in the custom order.
+- **Drag and drop to reorder and move.** Dropping on a file or a collapsed folder places the
+  items right below it, moving them into its folder if they came from elsewhere. Dropping on an
+  expanded folder moves them into it, and dropping on empty space moves them to the root.
+
+### Changed
+
+- The extension is renamed to "Custom File Order (Fork)" so it can be told apart from the original.
+
 ## [1.3.0]
 
 ### Added
