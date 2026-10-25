@@ -179,7 +179,7 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
 
     // File operations
     async createFile(target?: FileItem): Promise<void> {
-        const baseFolder = this.resolveFolder(target);
+        const baseFolder = this.resolveSiblingFolder(target);
         const name = await vscode.window.showInputBox({ prompt: 'New file name', placeHolder: 'example.ts' });
         if (!name) {
             return;
@@ -188,7 +188,7 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
         const newUri = vscode.Uri.file(path.join(baseFolder, name));
         try {
             await vscode.workspace.fs.writeFile(newUri, new Uint8Array());
-            await this.updateOrderOnCreate(baseFolder, name);
+            await this.insertAfter(baseFolder, name, target?.fileName);
             this.refresh();
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to create file: ${error}`);
@@ -196,7 +196,7 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
     }
 
     async createFolder(target?: FileItem): Promise<void> {
-        const baseFolder = this.resolveFolder(target);
+        const baseFolder = this.resolveSiblingFolder(target);
         const name = await vscode.window.showInputBox({ prompt: 'New folder name', placeHolder: 'new-folder' });
         if (!name) {
             return;
@@ -205,7 +205,7 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
         const newUri = vscode.Uri.file(path.join(baseFolder, name));
         try {
             await vscode.workspace.fs.createDirectory(newUri);
-            await this.updateOrderOnCreate(baseFolder, name);
+            await this.insertAfter(baseFolder, name, target?.fileName);
             this.refresh();
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to create folder: ${error}`);
@@ -374,6 +374,36 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
             return this.workspaceRoot;
         }
         return target.isDirectory ? target.filePath : (target.parentPath || this.workspaceRoot);
+    }
+
+    /** The folder holding the item, so new entries land beside it rather than inside it. */
+    private resolveSiblingFolder(target?: FileItem): string {
+        return target?.parentPath || this.workspaceRoot;
+    }
+
+    /**
+     * Place a freshly created entry directly below `afterName`. Without an
+     * anchor it falls back to the usual append-only behaviour.
+     */
+    private async insertAfter(folderPath: string, newName: string, afterName?: string): Promise<void> {
+        // A nested path such as `a/b.ts` shows up in this folder as `a`.
+        const entryName = newName.split(/[\\/]/)[0];
+        if (!afterName || entryName === afterName) {
+            await this.updateOrderOnCreate(folderPath, entryName);
+            return;
+        }
+
+        const names = this.getFilesAndFolders(folderPath)
+            .map((item: FileItem) => item.fileName)
+            .filter((name: string) => name !== entryName);
+        const anchor = names.indexOf(afterName);
+        if (anchor === -1) {
+            await this.updateOrderOnCreate(folderPath, entryName);
+            return;
+        }
+
+        names.splice(anchor + 1, 0, entryName);
+        await this.configManager.setOrderForFolder(folderPath, names);
     }
 
     private async generateCopyName(folderPath: string, baseName: string): Promise<string> {
