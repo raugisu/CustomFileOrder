@@ -22,8 +22,14 @@ export function activate(context: vscode.ExtensionContext) {
     const treeView = vscode.window.createTreeView('customFileOrder', {
         treeDataProvider: provider,
         showCollapseAll: true,
-        canSelectMany: true
+        canSelectMany: true,
+        dragAndDropController: provider
     });
+
+    context.subscriptions.push(
+        treeView.onDidExpandElement(e => provider.setExpanded(e.element.filePath, true)),
+        treeView.onDidCollapseElement(e => provider.setExpanded(e.element.filePath, false))
+    );
 
     /** The items a command should act on: the clicked item, or the selection. */
     const targets = (item?: any): any[] => {

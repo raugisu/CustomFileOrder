@@ -14,17 +14,33 @@ const GENERATED_FOLDERS = ['dist', 'build', 'out', '.next', '.nuxt'];
 /** Drives the `when` clause that hides Paste while the clipboard is empty. */
 const CLIPBOARD_CONTEXT = 'customFileOrder.hasClipboard';
 
-export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem> {
+/** Carries the dragged items' paths between handleDrag and handleDrop. */
+const DRAG_MIME = 'application/vnd.code.tree.customfileorder';
+
+export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem>, vscode.TreeDragAndDropController<FileItem> {
+    readonly dragMimeTypes = [DRAG_MIME];
+    readonly dropMimeTypes = [DRAG_MIME];
+
     private _onDidChangeTreeData: vscode.EventEmitter<FileItem | undefined | null | void> = new vscode.EventEmitter<FileItem | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<FileItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
     private configManager: ConfigManager;
     private workspaceRoot: string;
     private clipboard: { uris: vscode.Uri[]; isCut: boolean } | null = null;
+    private expandedFolders = new Set<string>();
 
     constructor(workspaceRoot: string) {
         this.workspaceRoot = workspaceRoot;
         this.configManager = ConfigManager.getInstance();
+    }
+
+    /** Tracks which folders are open, since a drop onto one depends on it. */
+    setExpanded(folderPath: string, expanded: boolean): void {
+        if (expanded) {
+            this.expandedFolders.add(folderPath);
+        } else {
+            this.expandedFolders.delete(folderPath);
+        }
     }
 
     refresh(): void {
@@ -140,6 +156,78 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
             vscode.window.setStatusBarMessage(`Moved ${label} ${offset < 0 ? 'up' : 'down'}`, 1500);
         } catch (error) {
             vscode.window.showErrorMessage(`Error moving item: ${error}`);
+        }
+    }
+
+    handleDrag(source: readonly FileItem[], dataTransfer: vscode.DataTransfer): void {
+        dataTransfer.set(DRAG_MIME, new vscode.DataTransferItem(source.map((item: FileItem) => item.filePath)));
+    }
+
+    /**
+     * Dropping on a file or a collapsed folder puts the items right below it,
+     * moving them into its folder if they came from elsewhere. Dropping on an
+     * expanded folder moves the items into it. Dropping on empty space moves
+     * them to the root.
+     */
+    async handleDrop(target: FileItem | undefined, dataTransfer: vscode.DataTransfer): Promise<void> {
+        const dragged = dataTransfer.get(DRAG_MIME);
+        if (!dragged) {
+            return;
+        }
+
+        const sources: string[] = dragged.value;
+        if (!Array.isArray(sources) || sources.length === 0) {
+            return;
+        }
+
+        const targetParent = target ? (target.parentPath || this.workspaceRoot) : this.workspaceRoot;
+
+        let destFolder: string;
+        let anchor: string | undefined;
+        if (!target) {
+            destFolder = this.workspaceRoot;
+        } else if (target.isDirectory && this.expandedFolders.has(target.filePath)) {
+            destFolder = target.filePath;
+        } else {
+            destFolder = targetParent;
+            anchor = target.fileName;
+        }
+
+        try {
+            const placed: string[] = [];
+            for (const source of sources) {
+                const name = path.basename(source);
+                const sourceFolder = path.dirname(source);
+                if (name === anchor && sourceFolder === destFolder) {
+                    continue;
+                }
+
+                if (sourceFolder === destFolder) {
+                    placed.push(name);
+                    continue;
+                }
+
+                // A folder cannot be moved into itself or its own descendants.
+                if (destFolder === source || destFolder.startsWith(source + path.sep)) {
+                    continue;
+                }
+
+                const destName = await this.generateNonConflictingName(destFolder, name);
+                await vscode.workspace.fs.rename(
+                    vscode.Uri.file(source),
+                    vscode.Uri.file(path.join(destFolder, destName)),
+                    { overwrite: false }
+                );
+                await this.updateOrderOnDelete(sourceFolder, name);
+                placed.push(destName);
+            }
+
+            if (placed.length > 0) {
+                await this.placeAfter(destFolder, placed, anchor);
+            }
+            this.refresh();
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to move: ${error}`);
         }
     }
 
@@ -387,22 +475,27 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
      */
     private async insertAfter(folderPath: string, newName: string, afterName?: string): Promise<void> {
         // A nested path such as `a/b.ts` shows up in this folder as `a`.
-        const entryName = newName.split(/[\\/]/)[0];
-        if (!afterName || entryName === afterName) {
-            await this.updateOrderOnCreate(folderPath, entryName);
-            return;
-        }
+        await this.placeAfter(folderPath, [newName.split(/[\\/]/)[0]], afterName);
+    }
 
+    /**
+     * Put `entries` (already present in the folder) directly below `afterName`
+     * in its custom order. Without a usable anchor they are appended, and only
+     * if the folder already has a rule.
+     */
+    private async placeAfter(folderPath: string, entries: readonly string[], afterName?: string): Promise<void> {
         const names = this.getFilesAndFolders(folderPath)
             .map((item: FileItem) => item.fileName)
-            .filter((name: string) => name !== entryName);
-        const anchor = names.indexOf(afterName);
+            .filter((name: string) => !entries.includes(name));
+        const anchor = afterName ? names.indexOf(afterName) : -1;
         if (anchor === -1) {
-            await this.updateOrderOnCreate(folderPath, entryName);
+            for (const entry of entries) {
+                await this.updateOrderOnCreate(folderPath, entry);
+            }
             return;
         }
 
-        names.splice(anchor + 1, 0, entryName);
+        names.splice(anchor + 1, 0, ...entries);
         await this.configManager.setOrderForFolder(folderPath, names);
     }
 
