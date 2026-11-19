@@ -87,6 +87,12 @@ export function activate(context: vscode.ExtensionContext) {
     const newFolderCommand = vscode.commands.registerCommand('customFileOrder.newFolder', (item?: any) => {
         provider.createFolder(item);
     });
+    const newFileAboveCommand = vscode.commands.registerCommand('customFileOrder.newFileAbove', (item?: any) => {
+        provider.createFile(item, 'before');
+    });
+    const newFolderAboveCommand = vscode.commands.registerCommand('customFileOrder.newFolderAbove', (item?: any) => {
+        provider.createFolder(item, 'before');
+    });
     const renameCommand = vscode.commands.registerCommand('customFileOrder.rename', async (item?: any) => {
         const target = item ?? treeView.selection[0];
         if (target) {
@@ -176,6 +182,8 @@ export function activate(context: vscode.ExtensionContext) {
         restoreItemCommand,
         newFileCommand,
         newFolderCommand,
+        newFileAboveCommand,
+        newFolderAboveCommand,
         renameCommand,
         deleteCommand,
         duplicateCommand,

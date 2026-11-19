@@ -17,6 +17,9 @@ const CLIPBOARD_CONTEXT = 'customFileOrder.hasClipboard';
 /** Carries the dragged items' paths between handleDrag and handleDrop. */
 const DRAG_MIME = 'application/vnd.code.tree.customfileorder';
 
+/** Where a new or moved entry lands relative to its anchor item. */
+export type PlacementPosition = 'before' | 'after';
+
 export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem>, vscode.TreeDragAndDropController<FileItem> {
     readonly dragMimeTypes = [DRAG_MIME];
     readonly dropMimeTypes = [DRAG_MIME];
@@ -223,7 +226,7 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
             }
 
             if (placed.length > 0) {
-                await this.placeAfter(destFolder, placed, anchor);
+                await this.placeRelative(destFolder, placed, anchor, 'after');
             }
             this.refresh();
         } catch (error) {
@@ -266,7 +269,7 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
     }
 
     // File operations
-    async createFile(target?: FileItem): Promise<void> {
+    async createFile(target?: FileItem, position: PlacementPosition = 'after'): Promise<void> {
         const baseFolder = this.resolveSiblingFolder(target);
         const name = await vscode.window.showInputBox({ prompt: 'New file name', placeHolder: 'example.ts' });
         if (!name) {
@@ -276,14 +279,14 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
         const newUri = vscode.Uri.file(path.join(baseFolder, name));
         try {
             await vscode.workspace.fs.writeFile(newUri, new Uint8Array());
-            await this.insertAfter(baseFolder, name, target?.fileName);
+            await this.insertNew(baseFolder, name, target?.fileName, position);
             this.refresh();
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to create file: ${error}`);
         }
     }
 
-    async createFolder(target?: FileItem): Promise<void> {
+    async createFolder(target?: FileItem, position: PlacementPosition = 'after'): Promise<void> {
         const baseFolder = this.resolveSiblingFolder(target);
         const name = await vscode.window.showInputBox({ prompt: 'New folder name', placeHolder: 'new-folder' });
         if (!name) {
@@ -293,7 +296,7 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
         const newUri = vscode.Uri.file(path.join(baseFolder, name));
         try {
             await vscode.workspace.fs.createDirectory(newUri);
-            await this.insertAfter(baseFolder, name, target?.fileName);
+            await this.insertNew(baseFolder, name, target?.fileName, position);
             this.refresh();
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to create folder: ${error}`);
@@ -470,24 +473,34 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
     }
 
     /**
-     * Place a freshly created entry directly below `afterName`. Without an
-     * anchor it falls back to the usual append-only behaviour.
+     * Place a freshly created entry directly below (or above) `anchorName`.
+     * Without an anchor it falls back to the usual append-only behaviour.
      */
-    private async insertAfter(folderPath: string, newName: string, afterName?: string): Promise<void> {
+    private async insertNew(
+        folderPath: string,
+        newName: string,
+        anchorName?: string,
+        position: PlacementPosition = 'after'
+    ): Promise<void> {
         // A nested path such as `a/b.ts` shows up in this folder as `a`.
-        await this.placeAfter(folderPath, [newName.split(/[\\/]/)[0]], afterName);
+        await this.placeRelative(folderPath, [newName.split(/[\\/]/)[0]], anchorName, position);
     }
 
     /**
-     * Put `entries` (already present in the folder) directly below `afterName`
-     * in its custom order. Without a usable anchor they are appended, and only
-     * if the folder already has a rule.
+     * Put `entries` (already present in the folder) directly below or above
+     * `anchorName` in its custom order. Without a usable anchor they are
+     * appended, and only if the folder already has a rule.
      */
-    private async placeAfter(folderPath: string, entries: readonly string[], afterName?: string): Promise<void> {
+    private async placeRelative(
+        folderPath: string,
+        entries: readonly string[],
+        anchorName?: string,
+        position: PlacementPosition = 'after'
+    ): Promise<void> {
         const names = this.getFilesAndFolders(folderPath)
             .map((item: FileItem) => item.fileName)
             .filter((name: string) => !entries.includes(name));
-        const anchor = afterName ? names.indexOf(afterName) : -1;
+        const anchor = anchorName ? names.indexOf(anchorName) : -1;
         if (anchor === -1) {
             for (const entry of entries) {
                 await this.updateOrderOnCreate(folderPath, entry);
@@ -495,7 +508,7 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
             return;
         }
 
-        names.splice(anchor + 1, 0, ...entries);
+        names.splice(position === 'before' ? anchor : anchor + 1, 0, ...entries);
         await this.configManager.setOrderForFolder(folderPath, names);
     }
 

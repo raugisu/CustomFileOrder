@@ -20,7 +20,8 @@ Make your important files stand out by moving them to the top, regardless of the
   - **Restore Item Position**: Reset a single file to its default alphabetical position within your custom list.
   - **Reset to Default Order**: Clear all custom ordering for a folder to revert to standard VS Code sorting.
 - **Folder Rules**: Global "Folders First" support to match your VS Code settings.
-- **Familiar Context Menu**: New File, New Folder, Open to the Side, Reveal in File Explorer,
+- **Familiar Context Menu**: New File, New Folder (created right below the clicked item), New File
+  Above, New Folder Above (created right above it), Open to the Side, Reveal in File Explorer,
   Open in Integrated Terminal, Cut/Copy/Paste, Copy Path, Copy Relative Path, Rename, Duplicate
   and Delete — on both files and folders, like the built-in Explorer.
 

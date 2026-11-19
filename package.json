@@ -83,6 +83,14 @@
         "icon": "$(new-folder)"
       },
       {
+        "command": "customFileOrder.newFileAbove",
+        "title": "New File Above"
+      },
+      {
+        "command": "customFileOrder.newFolderAbove",
+        "title": "New Folder Above"
+      },
+      {
         "command": "customFileOrder.openToSide",
         "title": "Open to the Side"
       },
@@ -158,9 +166,19 @@
           "group": "1_new@1"
         },
         {
-          "command": "customFileOrder.newFolder",
+          "command": "customFileOrder.newFileAbove",
           "when": "view == customFileOrder",
           "group": "1_new@2"
+        },
+        {
+          "command": "customFileOrder.newFolder",
+          "when": "view == customFileOrder",
+          "group": "1_new@3"
+        },
+        {
+          "command": "customFileOrder.newFolderAbove",
+          "when": "view == customFileOrder",
+          "group": "1_new@4"
         },
         {
           "command": "customFileOrder.openToSide",
@@ -301,6 +319,14 @@
         },
         {
           "command": "customFileOrder.openToSide",
+          "when": "false"
+        },
+        {
+          "command": "customFileOrder.newFileAbove",
+          "when": "false"
+        },
+        {
+          "command": "customFileOrder.newFolderAbove",
           "when": "false"
         }
       ]

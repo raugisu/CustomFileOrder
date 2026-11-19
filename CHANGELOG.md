@@ -12,6 +12,8 @@ Personal fork of the original extension. Settings and command IDs are unchanged.
 
 - **New File / New Folder from the context menu create the entry right below the clicked item**
   (as its sibling, never inside a folder) and place it there in the custom order.
+- **New File Above / New Folder Above** in the context menu create the entry right above the
+  clicked item instead, likewise as its sibling.
 - **Drag and drop to reorder and move.** Dropping on a file or a collapsed folder places the
   items right below it, moving them into its folder if they came from elsewhere. Dropping on an
   expanded folder moves them into it, and dropping on empty space moves them to the root.
