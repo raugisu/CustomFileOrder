@@ -10,6 +10,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 - **New File Above / New Folder Above** in the context menu create the entry right above the
   clicked item, as its sibling, and place it there in the custom order.
+- **A newly created entry is selected in the tree.** A new file is also opened in the editor
+  with focus, so you can start typing right away; a new folder keeps focus in the tree.
 
 ## [1.3.0-fork.1]
 

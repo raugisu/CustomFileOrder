@@ -39,6 +39,30 @@ export function activate(context: vscode.ExtensionContext) {
         return item ? [item] : [...treeView.selection];
     };
 
+    /**
+     * Select a freshly created entry in the tree. A file is also opened in the
+     * editor, which takes focus so typing can start right away; a folder keeps
+     * focus in the tree instead.
+     */
+    const revealCreated = async (createdPath: string | undefined, isFile: boolean): Promise<void> => {
+        if (!createdPath) {
+            return;
+        }
+
+        const created = provider.findItem(createdPath);
+        if (created) {
+            try {
+                await treeView.reveal(created, { select: true, focus: !isFile, expand: false });
+            } catch {
+                // Selecting is a convenience; never let it mask a successful create.
+            }
+        }
+
+        if (isFile) {
+            await vscode.window.showTextDocument(vscode.Uri.file(createdPath), { preview: false });
+        }
+    };
+
     // Register existing commands
     const refreshCommand = vscode.commands.registerCommand('customFileOrder.refresh', () => {
         provider.refresh();
@@ -81,17 +105,17 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // File operation commands
-    const newFileCommand = vscode.commands.registerCommand('customFileOrder.newFile', (item?: any) => {
-        provider.createFile(item);
+    const newFileCommand = vscode.commands.registerCommand('customFileOrder.newFile', async (item?: any) => {
+        await revealCreated(await provider.createFile(item), true);
     });
-    const newFolderCommand = vscode.commands.registerCommand('customFileOrder.newFolder', (item?: any) => {
-        provider.createFolder(item);
+    const newFolderCommand = vscode.commands.registerCommand('customFileOrder.newFolder', async (item?: any) => {
+        await revealCreated(await provider.createFolder(item), false);
     });
-    const newFileAboveCommand = vscode.commands.registerCommand('customFileOrder.newFileAbove', (item?: any) => {
-        provider.createFile(item, 'before');
+    const newFileAboveCommand = vscode.commands.registerCommand('customFileOrder.newFileAbove', async (item?: any) => {
+        await revealCreated(await provider.createFile(item, 'before'), true);
     });
-    const newFolderAboveCommand = vscode.commands.registerCommand('customFileOrder.newFolderAbove', (item?: any) => {
-        provider.createFolder(item, 'before');
+    const newFolderAboveCommand = vscode.commands.registerCommand('customFileOrder.newFolderAbove', async (item?: any) => {
+        await revealCreated(await provider.createFolder(item, 'before'), false);
     });
     const renameCommand = vscode.commands.registerCommand('customFileOrder.rename', async (item?: any) => {
         const target = item ?? treeView.selection[0];

@@ -65,6 +65,20 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
         return Promise.resolve(this.getFilesAndFolders(folderPath));
     }
 
+    /** Lets `TreeView.reveal` walk up from an item to the root. */
+    getParent(element: FileItem): FileItem | undefined {
+        if (!element.parentPath || element.parentPath === this.workspaceRoot) {
+            return undefined;
+        }
+        return this.findItem(element.parentPath);
+    }
+
+    /** The tree item for `filePath`, built the same way the tree shows it. */
+    findItem(filePath: string): FileItem | undefined {
+        return this.getFilesAndFolders(path.dirname(filePath))
+            .find((item: FileItem) => item.filePath === filePath);
+    }
+
     private getFilesAndFolders(folderPath: string): FileItem[] {
         if (!fs.existsSync(folderPath)) {
             return [];
@@ -269,11 +283,12 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
     }
 
     // File operations
-    async createFile(target?: FileItem, position: PlacementPosition = 'after'): Promise<void> {
+    /** Creates a file beside `target` and returns its path, or nothing if cancelled or failed. */
+    async createFile(target?: FileItem, position: PlacementPosition = 'after'): Promise<string | undefined> {
         const baseFolder = this.resolveSiblingFolder(target);
         const name = await vscode.window.showInputBox({ prompt: 'New file name', placeHolder: 'example.ts' });
         if (!name) {
-            return;
+            return undefined;
         }
 
         const newUri = vscode.Uri.file(path.join(baseFolder, name));
@@ -281,16 +296,19 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
             await vscode.workspace.fs.writeFile(newUri, new Uint8Array());
             await this.insertNew(baseFolder, name, target?.fileName, position);
             this.refresh();
+            return newUri.fsPath;
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to create file: ${error}`);
+            return undefined;
         }
     }
 
-    async createFolder(target?: FileItem, position: PlacementPosition = 'after'): Promise<void> {
+    /** Creates a folder beside `target` and returns its path, or nothing if cancelled or failed. */
+    async createFolder(target?: FileItem, position: PlacementPosition = 'after'): Promise<string | undefined> {
         const baseFolder = this.resolveSiblingFolder(target);
         const name = await vscode.window.showInputBox({ prompt: 'New folder name', placeHolder: 'new-folder' });
         if (!name) {
-            return;
+            return undefined;
         }
 
         const newUri = vscode.Uri.file(path.join(baseFolder, name));
@@ -298,8 +316,10 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
             await vscode.workspace.fs.createDirectory(newUri);
             await this.insertNew(baseFolder, name, target?.fileName, position);
             this.refresh();
+            return newUri.fsPath;
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to create folder: ${error}`);
+            return undefined;
         }
     }
 
