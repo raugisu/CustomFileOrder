@@ -517,7 +517,7 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
         }
 
         try {
-            await vscode.window.showTextDocument(item.resourceUri!, { viewColumn: vscode.ViewColumn.Beside });
+            await vscode.commands.executeCommand('vscode.open', item.resourceUri!, { viewColumn: vscode.ViewColumn.Beside });
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to open file: ${error}`);
         }

@@ -4,6 +4,14 @@ All notable changes to the "custom-file-order" extension will be documented in t
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [1.3.0-fork.4]
+
+### Fixed
+
+- **Images and other binary files now open from the tree.** Clicking an item, "Open to the Side",
+  and opening a newly created file use the editor that fits the file type (such as the image
+  preview) instead of always trying to open it as text.
+
 ## [1.3.0-fork.3]
 
 ### Added

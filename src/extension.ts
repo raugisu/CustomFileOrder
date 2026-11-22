@@ -59,7 +59,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         if (isFile) {
-            await vscode.window.showTextDocument(vscode.Uri.file(createdPath), { preview: false });
+            await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(createdPath), { preview: false });
         }
     };
 
@@ -68,8 +68,13 @@ export function activate(context: vscode.ExtensionContext) {
         provider.refresh();
     });
 
-    const openFileCommand = vscode.commands.registerCommand('customFileOrder.openFile', (resource: vscode.Uri) => {
-        vscode.window.showTextDocument(resource);
+    const openFileCommand = vscode.commands.registerCommand('customFileOrder.openFile', async (resource: vscode.Uri) => {
+        try {
+            // vscode.open picks the right editor for the file type (e.g. image preview for binaries).
+            await vscode.commands.executeCommand('vscode.open', resource);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to open file: ${error}`);
+        }
     });
 
     const revealInExplorerCommand = vscode.commands.registerCommand('customFileOrder.revealInExplorer', (item: any) => {
