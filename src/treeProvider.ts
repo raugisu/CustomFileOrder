@@ -17,12 +17,38 @@ const CLIPBOARD_CONTEXT = 'customFileOrder.hasClipboard';
 /** Carries the dragged items' paths between handleDrag and handleDrop. */
 const DRAG_MIME = 'application/vnd.code.tree.customfileorder';
 
+/** Carries drops coming from outside this tree, one URI per line. */
+const URI_LIST_MIME = 'text/uri-list';
+
+/** A dropped entry, and whether it should be moved or copied into place. */
+interface DropSource {
+    uri: vscode.Uri;
+    move: boolean;
+}
+
+/** Windows paths differ in case (drive letters especially) yet name the same entry. */
+function normalizePath(p: string): string {
+    const resolved = path.resolve(p);
+    return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+function isSamePath(a: string, b: string): boolean {
+    return normalizePath(a) === normalizePath(b);
+}
+
+/** True when `child` is `parent` itself or lies anywhere beneath it. */
+function isSameOrInside(child: string, parent: string): boolean {
+    const relative = path.relative(normalizePath(parent), normalizePath(child));
+    return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
 /** Where a new or moved entry lands relative to its anchor item. */
 export type PlacementPosition = 'before' | 'after';
 
 export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem>, vscode.TreeDragAndDropController<FileItem> {
     readonly dragMimeTypes = [DRAG_MIME];
-    readonly dropMimeTypes = [DRAG_MIME];
+    /** `text/uri-list` carries drops from the OS file manager and VS Code's Explorer. */
+    readonly dropMimeTypes = [DRAG_MIME, URI_LIST_MIME];
 
     private _onDidChangeTreeData: vscode.EventEmitter<FileItem | undefined | null | void> = new vscode.EventEmitter<FileItem | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<FileItem | undefined | null | void> = this._onDidChangeTreeData.event;
@@ -184,16 +210,12 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
      * Dropping on a file or a collapsed folder puts the items right below it,
      * moving them into its folder if they came from elsewhere. Dropping on an
      * expanded folder moves the items into it. Dropping on empty space moves
-     * them to the root.
+     * them to the root. Entries from inside the workspace are moved; entries
+     * from outside it (the OS file manager, say) are copied.
      */
     async handleDrop(target: FileItem | undefined, dataTransfer: vscode.DataTransfer): Promise<void> {
-        const dragged = dataTransfer.get(DRAG_MIME);
-        if (!dragged) {
-            return;
-        }
-
-        const sources: string[] = dragged.value;
-        if (!Array.isArray(sources) || sources.length === 0) {
+        const sources = await this.readDropSources(dataTransfer);
+        if (sources.length === 0) {
             return;
         }
 
@@ -212,30 +234,31 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
 
         try {
             const placed: string[] = [];
-            for (const source of sources) {
+            for (const { uri, move } of sources) {
+                const source = uri.fsPath;
                 const name = path.basename(source);
                 const sourceFolder = path.dirname(source);
-                if (name === anchor && sourceFolder === destFolder) {
+
+                if (move && isSamePath(sourceFolder, destFolder)) {
+                    if (name !== anchor) {
+                        placed.push(name);
+                    }
                     continue;
                 }
 
-                if (sourceFolder === destFolder) {
-                    placed.push(name);
-                    continue;
-                }
-
-                // A folder cannot be moved into itself or its own descendants.
-                if (destFolder === source || destFolder.startsWith(source + path.sep)) {
+                // A folder cannot be moved or copied into itself or its own descendants.
+                if (isSameOrInside(destFolder, source)) {
                     continue;
                 }
 
                 const destName = await this.generateNonConflictingName(destFolder, name);
-                await vscode.workspace.fs.rename(
-                    vscode.Uri.file(source),
-                    vscode.Uri.file(path.join(destFolder, destName)),
-                    { overwrite: false }
-                );
-                await this.updateOrderOnDelete(sourceFolder, name);
+                const destUri = vscode.Uri.file(path.join(destFolder, destName));
+                if (move) {
+                    await vscode.workspace.fs.rename(uri, destUri, { overwrite: false });
+                    await this.updateOrderOnDelete(sourceFolder, name);
+                } else {
+                    await vscode.workspace.fs.copy(uri, destUri, { overwrite: false });
+                }
                 placed.push(destName);
             }
 
@@ -244,8 +267,50 @@ export class CustomFileOrderProvider implements vscode.TreeDataProvider<FileItem
             }
             this.refresh();
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to move: ${error}`);
+            vscode.window.showErrorMessage(`Failed to drop: ${error}`);
+            this.refresh();
         }
+    }
+
+    /**
+     * What was dropped: this tree's own drag if present, otherwise the URI
+     * list that the OS file manager or VS Code's Explorer supplies.
+     */
+    private async readDropSources(dataTransfer: vscode.DataTransfer): Promise<DropSource[]> {
+        const internal = dataTransfer.get(DRAG_MIME);
+        if (internal) {
+            const paths: unknown = internal.value;
+            if (!Array.isArray(paths)) {
+                return [];
+            }
+            return paths.map((p: string) => ({ uri: vscode.Uri.file(p), move: true }));
+        }
+
+        const uriList = dataTransfer.get(URI_LIST_MIME);
+        if (!uriList) {
+            return [];
+        }
+
+        const text = await uriList.asString();
+        const sources: DropSource[] = [];
+        for (const line of text.split(/\r?\n/)) {
+            const trimmed = line.trim();
+            // `#` lines are comments in the text/uri-list format.
+            if (!trimmed || trimmed.startsWith('#')) {
+                continue;
+            }
+            let uri: vscode.Uri;
+            try {
+                uri = vscode.Uri.parse(trimmed, true);
+            } catch {
+                continue;
+            }
+            if (uri.scheme !== 'file') {
+                continue;
+            }
+            sources.push({ uri, move: isSameOrInside(uri.fsPath, this.workspaceRoot) });
+        }
+        return sources;
     }
 
     /** Put one item back where default sorting would place it. */

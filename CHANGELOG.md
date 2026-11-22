@@ -4,6 +4,14 @@ All notable changes to the "custom-file-order" extension will be documented in t
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [1.3.0-fork.3]
+
+### Added
+
+- **Drop files from outside the tree.** Files and folders dragged in from the OS file manager
+  are copied to the drop position, and ones dragged from VS Code's Explorer within the
+  workspace are moved there, following the same placement rules as dragging within the tree.
+
 ## [1.3.0-fork.2]
 
 ### Added
