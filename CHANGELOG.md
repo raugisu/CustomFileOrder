@@ -4,6 +4,19 @@ All notable changes to the "custom-file-order" extension will be documented in t
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [1.3.0-fork.5]
+
+### Changed
+
+- **Clicking a file keeps focus in the tree**, like the Explorer: a single click opens a preview
+  so you can keep navigating with the keyboard, and a double click pins the editor and moves
+  focus to it.
+
+### Added
+
+- **Enter opens the selected item**, like the Explorer: a file opens pinned with focus in the
+  editor, and a folder is expanded or collapsed.
+
 ## [1.3.0-fork.4]
 
 ### Fixed

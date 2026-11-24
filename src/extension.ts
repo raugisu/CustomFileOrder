@@ -68,10 +68,25 @@ export function activate(context: vscode.ExtensionContext) {
         provider.refresh();
     });
 
+    // Mimic the Explorer: a single click opens a preview and keeps focus in the
+    // tree so keyboard navigation continues; a double click (the same item
+    // clicked again quickly) pins the editor and moves focus to it.
+    const DOUBLE_CLICK_MS = 500;
+    let lastOpen: { path: string; time: number } | undefined;
+
     const openFileCommand = vscode.commands.registerCommand('customFileOrder.openFile', async (resource: vscode.Uri) => {
+        const now = Date.now();
+        const isDoubleClick = !!lastOpen
+            && lastOpen.path === resource.fsPath
+            && now - lastOpen.time < DOUBLE_CLICK_MS;
+        lastOpen = isDoubleClick ? undefined : { path: resource.fsPath, time: now };
+
         try {
             // vscode.open picks the right editor for the file type (e.g. image preview for binaries).
-            await vscode.commands.executeCommand('vscode.open', resource);
+            await vscode.commands.executeCommand('vscode.open', resource, {
+                preserveFocus: !isDoubleClick,
+                preview: !isDoubleClick
+            });
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to open file: ${error}`);
         }
@@ -155,6 +170,23 @@ export function activate(context: vscode.ExtensionContext) {
             await provider.copyRelativePath(target);
         }
     });
+    // Enter in the tree, like the Explorer: a file opens pinned with focus in
+    // the editor; a folder toggles its expansion.
+    const openSelectedCommand = vscode.commands.registerCommand('customFileOrder.openSelected', async () => {
+        const target = treeView.selection[0];
+        if (!target) {
+            return;
+        }
+        if (target.isDirectory) {
+            await vscode.commands.executeCommand('list.toggleExpand');
+            return;
+        }
+        try {
+            await vscode.commands.executeCommand('vscode.open', target.resourceUri, { preserveFocus: false, preview: false });
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to open file: ${error}`);
+        }
+    });
     const openToSideCommand = vscode.commands.registerCommand('customFileOrder.openToSide', async (item?: any) => {
         const target = item ?? treeView.selection[0];
         if (target) {
@@ -222,6 +254,7 @@ export function activate(context: vscode.ExtensionContext) {
         copyPathCommand,
         copyRelativePathCommand,
         openToSideCommand,
+        openSelectedCommand,
         openInTerminalCommand,
         configWatcher,
         fileWatcher,

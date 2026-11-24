@@ -2,7 +2,7 @@
   "name": "custom-file-order-fork",
   "displayName": "Custom File Order (Fork)",
   "description": "Custom file and folder ordering in explorer",
-  "version": "1.3.0-fork.4",
+  "version": "1.3.0-fork.5",
   "publisher": "RARI",
   "repository": {
     "type": "git",
@@ -93,6 +93,10 @@
       {
         "command": "customFileOrder.openToSide",
         "title": "Open to the Side"
+      },
+      {
+        "command": "customFileOrder.openSelected",
+        "title": "Open Selected Item"
       },
       {
         "command": "customFileOrder.openInTerminal",
@@ -322,6 +326,10 @@
           "when": "false"
         },
         {
+          "command": "customFileOrder.openSelected",
+          "when": "false"
+        },
+        {
           "command": "customFileOrder.newFileAbove",
           "when": "false"
         },
@@ -392,6 +400,11 @@
         "command": "customFileOrder.paste",
         "key": "ctrl+v",
         "when": "focusedView == customFileOrder"
+      },
+      {
+        "command": "customFileOrder.openSelected",
+        "key": "enter",
+        "when": "focusedView == customFileOrder && !inputFocus"
       }
     ]
   },
